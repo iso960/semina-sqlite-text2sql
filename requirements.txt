@@ -1,0 +1,6 @@
+# SQLite Text-to-SQL 실습 (표준 라이브러리만 사용 가능)
+# sqlite3, re, os 등 내장 모듈만 사용하므로 비워두거나 아래만 사용
+
+# 선택: 실제 LLM으로 NL->SQL 만들 때
+# openai>=1.0.0
+# anthropic>=0.18.0
