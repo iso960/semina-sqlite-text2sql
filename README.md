@@ -13,6 +13,7 @@
   - 로컬 SQLite DB(`memory.db`)를 조회해서 결과를 반환합니다.
 
 - **핵심 포인트**
+  - **Gemini API** 또는 규칙 기반으로 자연어 → SQL 변환 (API 키가 있으면 Gemini 사용, 없으면 규칙 기반 폴백)
   - DB 구조를 **MCP 스키마 리소스**로 제공 → 모델/에이전트가 정확한 컬럼명·테이블명으로 SQL 생성
   - 모든 사용자 입력은 **파라미터화된 쿼리**로만 전달 → SQL Injection 방지
   - SQLite 파일을 간단한 **장기 기억 저장소**처럼 활용
@@ -50,13 +51,13 @@
       - `;`를 사용한 다중 쿼리 차단.
       - `cur.execute(sql, params)` 로만 실행 → **파라미터화된 쿼리** 강제.
     - `natural_to_sql(natural)` :
-      - 간단한 규칙 기반으로 자연어를 (SQL, params)로 변환합니다.
+      - **`GEMINI_API_KEY`가 .env에 있으면** Gemini API로 자연어 → (SQL, params) 생성 (스키마 + 질문을 모델에 전달).
+      - **키가 없거나 API 호출 실패 시** 규칙 기반으로 폴백합니다.
       - 예)
         - `"사용자 목록 보여줘"` → `SELECT id, name, email, created_at FROM users`, `()`
         - `"이름이 박소이인 사용자 찾아줘"` → `SELECT ... FROM users WHERE name = ?`, `('박소이',)`
         - `"메모 목록"` → `SELECT ... FROM memos m JOIN users u ...`
         - `"제목에 회의 포함된 메모 검색"` → `... WHERE m.title LIKE ?`, `('%회의%',)`
-      - 실제 서비스에서는 이 부분을 LLM 호출로 교체하면 됩니다 (스키마 + 자연어를 모델에 전달).
     - `ask(natural)` :
       - 자연어 → `natural_to_sql()` → `execute_safe()`까지 한 번에 호출하는 편의 함수.
 
@@ -83,17 +84,38 @@
     - 사용자 수가 몇 명이야?
 
 - **`requirements.txt`**
-  - 현재 코드는 Python 표준 라이브러리(`sqlite3`, `os`, `re` 등)만 사용하므로 필수 외부 의존성은 없습니다.
-  - 추후 OpenAI/Anthropic 등 LLM을 붙일 때 사용할 수 있는 패키지 예시를 주석으로 남겨두었습니다.
+  - `google-genai` : Gemini API 호출 (자연어 → SQL).
+  - `python-dotenv` : `.env`에서 `GEMINI_API_KEY` 로드.
+
+- **`.env`** (직접 생성, Git에는 포함되지 않음)
+  - `GEMINI_API_KEY=발급받은_키` 형식으로 넣으면 Gemini를 사용합니다.
+  - 키가 없어도 규칙 기반으로 동작합니다.
+
+- **`.env.example`**
+  - `.env` 예시. 복사 후 키만 채우면 됩니다.
+
+- **`.gitignore`**
+  - `.env`를 제외해 API 키가 커밋되지 않도록 합니다.
 
 ---
 
 ## 실행 방법
 
+### 0) 사전 준비
+
+```bash
+cd semina-sqlite-text2sql
+pip install -r requirements.txt
+```
+
+- **Gemini 사용(선택)**  
+  [Google AI Studio](https://aistudio.google.com/app/apikey)에서 API 키를 발급한 뒤, 프로젝트 폴더에 `.env` 파일을 만들고 다음 한 줄을 넣습니다.  
+  `GEMINI_API_KEY=발급받은_키`  
+  키가 없으면 규칙 기반으로만 동작합니다.
+
 ### 1) 대화형 모드 실행
 
 ```bash
-cd c:\Users\PC\Desktop\semina
 python main.py
 ```
 
@@ -162,12 +184,7 @@ python run_demo.py
 
 ## 확장 아이디어
 
-- `natural_to_sql()`를 규칙 기반이 아니라 실제 LLM 호출로 교체
-  - 입력: 자연어 질문 + `read_schema()`로 읽은 스키마
-  - 출력: `SELECT` 쿼리와 파라미터 구조
+- `natural_to_sql()`는 이미 **Gemini API** 연동이 적용되어 있으며, 키가 없을 때만 규칙 기반으로 동작합니다.
 - `memos` 테이블을 활용해
   - 챗봇의 “장기 기억” 저장소로 확장
   - 사용자별 대화 요약/노트 저장 후 검색
-
-이 레포지토리는 **“MCP + Text-to-SQL + 안전한 쿼리 실행”**의 최소 예제로,  
-발표, 포트폴리오, 학습용으로 바로 활용할 수 있습니다.
